@@ -1,0 +1,5 @@
+[mcp_servers.obsidian]
+url = "https://127.0.0.1:27124/mcp/"
+
+[mcp_servers.obsidian.http_headers]
+Authorization = "Bearer bdbcea74611a377ae14f47939d4ab1090cc15ca538df4962abc3256de6e7588c"
