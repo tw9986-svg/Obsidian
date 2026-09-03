@@ -57,7 +57,7 @@ $body = @{
     }
 } | ConvertTo-Json -Depth 10
 
-$uri = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$apiKey"
+$uri = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$apiKey"
 $response = Invoke-RestMethod -Method Post -Uri $uri -ContentType "application/json; charset=utf-8" -Body $body
 $guidance = $response.candidates[0].content.parts[0].text
 if ([string]::IsNullOrWhiteSpace($guidance)) {
