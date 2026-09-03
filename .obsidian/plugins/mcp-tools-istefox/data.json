@@ -2,6 +2,9 @@
   "toolLoading": {
     "profile": "all",
     "promoted": [],
+    "counters": {
+      "get_server_info": 1
+    },
     "profiles": {
       "default": {
         "profile": "all",
@@ -22,12 +25,12 @@
     "bearerToken": "5VPGna7ww3fpl1k6JSA0uyIrrgnhOLHX1cXqvdPG_80",
     "livePort": 27200,
     "eraCounters": {
-      "legacy": 30,
+      "legacy": 31,
       "modern": 3
     },
     "eraCountersByToken": {
       "default": {
-        "legacy": 30,
+        "legacy": 31,
         "modern": 3
       }
     }
