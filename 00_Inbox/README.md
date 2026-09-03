@@ -27,6 +27,10 @@
 
 Gemini는 [Gemini 연구 감독자 지침](../04_Projects/gemini-research-director.md)의 읽기 순서와 출력 계약을 따른다.
 
+## Claude Code Desktop 자동 반영
+
+Claude Code Desktop에서 `D:\Reserch`를 열고 수정한 내용까지 자동 커밋하려면 VS Code에서 `Terminal: Run Task`가 아니라 `Tasks: Run Task`를 선택해 **Research: watch and auto-commit**을 시작한다. 감시 프로세스가 실행 중인 동안 Desktop의 변경은 10초의 안정화 대기 후 GitHub `main`으로 커밋·푸시된다.
+
 ## 처리 원칙
 
 - **Raw 원본 보존** — `01_Raw/`로 옮긴 뒤에는 편집·삭제·이름변경 금지

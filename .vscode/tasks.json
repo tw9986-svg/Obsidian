@@ -1,0 +1,19 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Research: watch and auto-commit",
+            "type": "shell",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\Scripts\\watch-and-auto-commit.ps1"
+            ],
+            "isBackground": true,
+            "problemMatcher": []
+        }
+    ]
+}

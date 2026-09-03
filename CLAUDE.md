@@ -71,6 +71,7 @@ Claude Code Desktop에서 **Open folder**로 `D:\Reserch`를 직접 열어 작�
 - 원본은 `01_Raw/`에 보존하고, 새 자료는 `00_Inbox/`에만 저장한다.
 - Desktop과 VS Code에서 같은 파일을 동시에 편집하지 않는다. 저장 충돌을 피하려면 한 번에 한 클라이언트만 편집한다.
 - VS Code의 Run on Save 자동 커밋은 VS Code 저장 이벤트에만 반응한다. Desktop에서 수정한 뒤에는 VS Code에서 해당 파일을 확인·저장하거나 Git을 별도로 실행해야 한다.
+- Desktop 수정도 자동 커밋하려면 VS Code 작업 `Research: watch and auto-commit`을 실행하거나 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\Reserch\Scripts\watch-and-auto-commit.ps1`를 별도 터미널에서 실행한다. 감시 프로세스는 변경이 10초간 멈춘 뒤 커밋·푸시한다.
 
 ## Data 표준 항목 (03_Data 페이지 / registry.md 공통)
 
