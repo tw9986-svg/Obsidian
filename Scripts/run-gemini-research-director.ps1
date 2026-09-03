@@ -45,23 +45,41 @@ $($parts -join "`n`n")
 "@
 
 $body = @{
-    contents = @(
-        @{
-            role = "user"
-            parts = @(@{ text = $prompt })
-        }
-    )
-    generationConfig = @{
-        temperature = 0.1
-        responseMimeType = "text/plain"
+    agent = "deep-research-preview-04-2026"
+    input = $prompt
+    background = $true
+    agentConfig = @{
+        type = "deep-research"
+        thinkingSummaries = "auto"
     }
 } | ConvertTo-Json -Depth 10
 
-$uri = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$apiKey"
-$response = Invoke-RestMethod -Method Post -Uri $uri -ContentType "application/json; charset=utf-8" -Body $body
-$guidance = $response.candidates[0].content.parts[0].text
+$createUri = "https://generativelanguage.googleapis.com/v1beta/interactions?key=$apiKey"
+$interaction = Invoke-RestMethod -Method Post -Uri $createUri -ContentType "application/json; charset=utf-8" -Body $body
+$interactionId = $interaction.id
+if ([string]::IsNullOrWhiteSpace($interactionId)) {
+    throw "Gemini Deep Research did not return an interaction ID."
+}
+
+$guidance = $null
+for ($attempt = 1; $attempt -le 60; $attempt++) {
+    Start-Sleep -Seconds 10
+    $pollUri = "https://generativelanguage.googleapis.com/v1beta/interactions/$interactionId`?key=$apiKey"
+    $result = Invoke-RestMethod -Method Get -Uri $pollUri
+    if ($result.status -eq "completed") {
+        $lastOutput = @($result.outputs) | Select-Object -Last 1
+        if ($null -ne $lastOutput.content.text) {
+            $guidance = $lastOutput.content.text
+        }
+        break
+    }
+    if ($result.status -in @("failed", "cancelled")) {
+        throw "Gemini Deep Research ended with status: $($result.status)"
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($guidance)) {
-    throw "Gemini returned an empty guidance document."
+    throw "Gemini Deep Research timed out or returned an empty guidance document."
 }
 
 $date = Get-Date -Format "yyyy-MM-dd"
