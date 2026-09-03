@@ -23,9 +23,32 @@ $parts = foreach ($relativePath in $inputFiles) {
     "### FILE: $relativePath`n" + (Get-Content -LiteralPath $path -Raw)
 }
 
+$contextDirectories = @(
+    "02_Wiki/issues",
+    "02_Wiki/systems/msre/verification",
+    "00_Inbox"
+)
+
+foreach ($relativeDirectory in $contextDirectories) {
+    $directory = Join-Path $repoRoot $relativeDirectory
+    if (-not (Test-Path -LiteralPath $directory)) {
+        throw "Required Gemini input directory is missing: $relativeDirectory"
+    }
+
+    $files = Get-ChildItem -LiteralPath $directory -File -Recurse |
+        Where-Object { $_.Extension -in @(".md", ".csv", ".json") -and $_.Name -ne "README.md" }
+    foreach ($file in $files) {
+        $relativePath = $file.FullName.Substring($repoRoot.Length + 1)
+        $parts += "### FILE: $relativePath`n" + (Get-Content -LiteralPath $file.FullName -Raw)
+        $inputFiles += $relativePath
+    }
+}
+
 $prompt = @"
 You are Gemini acting only as Research Director for the nuclear thermal-hydraulics knowledge base.
 Read the supplied files and produce a Korean Markdown research guidance document.
+Treat the project status table as the authoritative completion state. Distinguish PASS/completed,
+in progress, planned/not started, BLOCKED, UNKNOWN, and conflicting items.
 Do not invent numerical values or citations. Mark unsupported values UNKNOWN.
 Do not edit, move, delete, or create any vault file; return guidance text only.
 
