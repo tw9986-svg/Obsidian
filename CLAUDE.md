@@ -63,6 +63,15 @@
   하위: `_duplicates/`(바이트 동일 중복, 삭제 대신 격리), `_nonresearch/`(연구자료 아님). 상세: `00_Inbox/README.md`.
 - `99_Attachments/` — 이미지 등 첨부. Benchmark/verification 결과 플롯, digitization용 원본 그림 등도 여기 저장.
 
+### Claude Code Desktop 작업 경로
+
+Claude Code Desktop에서 **Open folder**로 `D:\Reserch`를 직접 열어 작업한다. 이 폴더가 Obsidian Vault와 동일한 실제 경로이므로 Desktop에서 생성·수정한 파일은 별도 복사나 REST API 없이 즉시 Vault에 반영된다.
+
+- 작업 루트는 반드시 `D:\Reserch`로 지정한다. `D:\Reserch\raw` 같은 과거 경로 또는 복제 폴더를 사용하지 않는다.
+- 원본은 `01_Raw/`에 보존하고, 새 자료는 `00_Inbox/`에만 저장한다.
+- Desktop과 VS Code에서 같은 파일을 동시에 편집하지 않는다. 저장 충돌을 피하려면 한 번에 한 클라이언트만 편집한다.
+- VS Code의 Run on Save 자동 커밋은 VS Code 저장 이벤트에만 반응한다. Desktop에서 수정한 뒤에는 VS Code에서 해당 파일을 확인·저장하거나 Git을 별도로 실행해야 한다.
+
 ## Data 표준 항목 (03_Data 페이지 / registry.md 공통)
 
 `03_Data/`의 모든 페이지·registry 행은 아래 필드를 포함합니다:
