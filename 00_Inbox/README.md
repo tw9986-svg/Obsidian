@@ -31,6 +31,10 @@ Gemini는 [Gemini 연구 감독자 지침](../04_Projects/gemini-research-direct
 
 Claude Code Desktop에서 `D:\Reserch`를 열고 수정한 내용까지 자동 커밋하려면 VS Code에서 `Terminal: Run Task`가 아니라 `Tasks: Run Task`를 선택해 **Research: watch and auto-commit**을 시작한다. 감시 프로세스가 실행 중인 동안 Desktop의 변경은 10초의 안정화 대기 후 GitHub `main`으로 커밋·푸시된다.
 
+## Inbox 자동 편입 파이프라인
+
+Claude Code CLI가 설치된 환경에서 VS Code 작업 **Research: watch and ingest Inbox**를 실행하면 `00_Inbox`의 신규 자료를 감시한다. 파일이 10초간 안정되면 Claude Code headless `/wiki-ingest`가 한 건씩 실행되어 `01_Raw`, `02_Wiki`, `03_Data`, `index.md`, 로그를 갱신한다. 처리 상태는 `.claude/state/`에 SHA-256으로 기록하며 Git에는 포함하지 않는다. CLI가 없으면 파이프라인은 오류를 표시하고 중단한다.
+
 ## 처리 원칙
 
 - **Raw 원본 보존** — `01_Raw/`로 옮긴 뒤에는 편집·삭제·이름변경 금지

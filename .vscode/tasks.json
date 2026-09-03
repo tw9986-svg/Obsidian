@@ -14,6 +14,20 @@
             ],
             "isBackground": true,
             "problemMatcher": []
+        },
+        {
+            "label": "Research: watch and ingest Inbox",
+            "type": "shell",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\Scripts\\watch-and-ingest-inbox.ps1"
+            ],
+            "isBackground": true,
+            "problemMatcher": []
         }
     ]
 }
