@@ -1,0 +1,259 @@
+within MSRE.Verification;
+model Pump_R1_Torque
+  "What the operating-point hydraulic torque relation (R1) does, and where it stops being a torque model"
+  extends Modelica.Icons.Example;
+
+  final parameter MSRE.Data.Geometry geometry "Plant geometry";
+
+  /* Everything below is reproduced from MSRE.Components.FuelPump_Dynamics and
+     MSRE.Components.BaseClasses.PartialFuelPump, from the SAME parameters. The torque relation is
+     algebraic in (omega, V_flow), so a sweep is the complete statement of what it does - there is
+     no transient to run to find out. Keeping it a parameter sweep also means this model compiles
+     and answers in seconds, which is what makes it usable as the gate before the plant runs. */
+  parameter SI.Density d_test=2188.646 "Fuel salt density, the pump's own d_nominal";
+  parameter SI.Efficiency eta=0.8
+    "ASSUMED. No MSRE fuel pump efficiency measurement was found; this is the value already
+     carried by Data.Geometry.eta_pump and already used to DEFINE tau_hyd_nominal, so R1 reuses
+     it rather than introducing a second one";
+
+  final parameter SI.VolumeFlowRate V_nom=geometry.m_flow_nominal/d_test "Rated volumetric flow";
+  final parameter SI.AngularVelocity w_nom=2*pi*geometry.N_pump_nominal/60 "Rated speed";
+  final parameter SI.Height head_nom=geometry.dp_pump_nominal/(d_test*Modelica.Constants.g_n);
+  final parameter SI.Height head_shutoff=geometry.headRatio_shutoff*head_nom;
+  final parameter Real R_pump(unit="s2/m5") = (geometry.headRatio_shutoff - 1)*head_nom/V_nom^2;
+  final parameter SI.Torque tau_nom=geometry.dp_pump_nominal*V_nom/(w_nom*eta)
+    "R0 rated hydraulic torque; identically the R1 relation evaluated at the rated point";
+  final parameter SI.AngularVelocity w_reg=0.01*w_nom "Regularization width";
+
+  /* ---- the two relations, as functions of the operating point ---- */
+  function dp_of
+    input Real w, V, w_nom, head_shutoff, R_pump, d;
+    output Real dp;
+  algorithm
+    dp := d*Modelica.Constants.g_n*(head_shutoff*(w/w_nom)^2 - R_pump*V*abs(V));
+  end dp_of;
+
+  function tau_R1_of
+    input Real w, V, w_nom, head_shutoff, R_pump, d, eta, w_reg;
+    output Real tau;
+  protected
+    Real P, Ps;
+  algorithm
+    P := dp_of(w, V, w_nom, head_shutoff, R_pump, d)*V;
+    Ps := 0.5*(1/eta + eta)*P + 0.5*(1/eta - eta)*abs(P);
+    tau := Ps*w/(w^2 + w_reg^2);
+  end tau_R1_of;
+
+  function tau_R0_of
+    input Real w, w_nom, tau_nom;
+    output Real tau;
+  algorithm
+    tau := tau_nom*w*abs(w)/w_nom^2;
+  end tau_R0_of;
+
+  /* ================= 1. Nominal steady invariance =================
+     R1 must return the rated torque at the rated point, because tau_nom IS that relation
+     evaluated there. The only thing that can move it is the regularization, and by exactly a
+     known factor - so this is an identity to check, not a tolerance to pick. */
+  final parameter SI.Torque tau_R1_nom=tau_R1_of(w_nom, V_nom, w_nom, head_shutoff, R_pump,
+      d_test, eta, w_reg);
+  final parameter Real ratio_nom=tau_R1_nom/tau_nom "Measured";
+  final parameter Real ratio_nom_predicted=1/(1 + (w_reg/w_nom)^2) "Predicted, exactly";
+  final parameter Real err_nomInvariance=abs(ratio_nom/ratio_nom_predicted - 1)
+    "Departure from the predicted regularization factor. A round-off bound, not a physical one";
+
+  /* ================= 2. Agreement on the affinity line =================
+     Along V/w = V_nom/w_nom the pump stays on its rated similarity point, dp scales as w^2 and
+     V as w, so dp*V/w scales as w^2 - the R0 law. R0 and R1 must therefore agree there, to
+     within the same regularization factor and nothing else. This is the statement that R1
+     GENERALIZES R0 rather than replacing it. */
+  parameter Integer nAff=9 "# of points along the affinity line";
+  final parameter Real f_aff[nAff]={1.0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2}
+    "Speed fractions swept, all well above the regularization width";
+  final parameter Real err_affinity[nAff]={abs(tau_R1_of(
+      f_aff[i]*w_nom,
+      f_aff[i]*V_nom,
+      w_nom,
+      head_shutoff,
+      R_pump,
+      d_test,
+      eta,
+      w_reg)/(tau_R0_of(f_aff[i]*w_nom, w_nom, tau_nom)/(1 + (w_reg/(f_aff[i]*w_nom))^2)) - 1)
+      for i in 1:nAff} "Departure from R0 once the known regularization factor is divided out";
+  final parameter Real err_affinity_max=max(err_affinity);
+
+  /* ================= 3. Low speed, off the affinity line =================
+     The sweep that matters. Rated FORWARD flow is held while the speed is taken down through
+     zero and reversed - which is the state a tripped pump is driven into by the loop inertia. */
+  parameter Integer nLow=61 "# of speeds swept, odd so that zero is sampled exactly";
+  parameter Real f_low_max=0.5 "Widest speed fraction swept, either side of zero";
+  final parameter SI.AngularVelocity w_low[nLow]={f_low_max*w_nom*(1 - 2*(i - 1)/(nLow - 1))
+      for i in 1:nLow} "Swept speeds, from +f_low_max*w_nom through exactly zero to -that";
+  final parameter SI.Torque tau_low[nLow]={tau_R1_of(
+      w_low[i],
+      V_nom,
+      w_nom,
+      head_shutoff,
+      R_pump,
+      d_test,
+      eta,
+      w_reg) for i in 1:nLow} "R1 torque at rated forward flow, across the speed reversal";
+  final parameter Integer iZero=integer((nLow + 1)/2) "Index of the exactly-zero speed";
+
+  /* Finiteness. The regularized reciprocal w/(w^2+w_reg^2) attains its extremum at w = w_reg,
+     where it equals 1/(2*w_reg). So |tau_R1| can never exceed |P_shaft|/(2*w_reg), for ANY
+     speed including zero - that bound is a property of the regularization and is what makes the
+     relation finite. It is asserted rather than assumed. */
+  final parameter SI.Power P_hyd_low=dp_of(0, V_nom, w_nom, head_shutoff, R_pump, d_test)*V_nom
+    "Hydraulic power at zero speed and rated forward flow; NEGATIVE, the stream is being throttled";
+  final parameter SI.Power P_shaft_low=0.5*(1/eta + eta)*P_hyd_low + 0.5*(1/eta - eta)*abs(
+      P_hyd_low);
+  final parameter SI.Torque tau_bound=abs(P_shaft_low)/(2*w_reg)
+    "Ceiling the regularization puts on the torque in this sweep";
+  final parameter SI.Torque tau_low_absmax=max({abs(tau_low[i]) for i in 1:nLow});
+
+  /* Sign and oddness. dp depends on the speed only through w^2, so P_hyd is EVEN in w and the
+     torque is ODD. Reversing the shaft must reverse the torque exactly. */
+  final parameter Real err_odd=max({abs(tau_low[i] + tau_low[nLow + 1 - i]) for i in 1:nLow})
+    "Largest failure of tau(-w) = -tau(w). An exact antisymmetry, so this is a round-off bound";
+  final parameter SI.Torque tau_atZero=tau_low[iZero] "Torque at exactly zero speed";
+
+  /* Continuity, tested by GRID REFINEMENT rather than by the size of a step.
+
+     The first version of this test compared the largest step in the sweep to the mean step and
+     required the ratio to stay under 10. That test was WRONG, and it failed on a function that
+     is provably smooth. The relation has a genuine narrow peak at w = w_reg - that is where the
+     regularized reciprocal attains 1/(2*w_reg) - so on a uniform grid that does not resolve the
+     peak the largest step is legitimately many times the mean one. Refining the grid makes the
+     ratio WORSE, not better (it goes 15, 30, 43, 48 as the grid is halved four times), which is
+     the proof that the ratio was measuring resolution and not continuity.
+
+     What actually separates a smooth function from a jump is how the largest step behaves under
+     refinement. For a Lipschitz function the largest step is bounded by max|f'|*h and so HALVES
+     when h halves; across a discontinuity it stays at the height of the jump. Two sweeps over
+     the same interval, one at twice the resolution of the other, therefore settle it with no
+     torque tolerance to choose at all - the number compared against is 1/2, and it comes from
+     the definition of a derivative. The interval is kept to a few regularization widths so that
+     the peak is resolved on both grids. */
+  parameter Integer nC=81 "# of points on the coarse continuity grid";
+  final parameter Integer nF=2*nC - 1 "Fine grid: the same interval at twice the resolution";
+  final parameter SI.AngularVelocity w_span=5*w_reg
+    "Half-width of the continuity sweep, wide enough to contain the peak at w_reg on both grids";
+
+  final parameter SI.Torque tauC[nC]={tau_R1_of(
+      w_span*(1 - 2*(i - 1)/(nC - 1)),
+      V_nom,
+      w_nom,
+      head_shutoff,
+      R_pump,
+      d_test,
+      eta,
+      w_reg) for i in 1:nC};
+  final parameter SI.Torque tauF[nF]={tau_R1_of(
+      w_span*(1 - 2*(i - 1)/(nF - 1)),
+      V_nom,
+      w_nom,
+      head_shutoff,
+      R_pump,
+      d_test,
+      eta,
+      w_reg) for i in 1:nF};
+  final parameter SI.Torque step_C=max({abs(tauC[i + 1] - tauC[i]) for i in 1:nC - 1})
+    "Largest step on the coarse grid";
+  final parameter SI.Torque step_F=max({abs(tauF[i + 1] - tauF[i]) for i in 1:nF - 1})
+    "Largest step on the fine grid";
+  final parameter Real refineRatio=step_F/noEvent(max(step_C, 1e-30))
+    "Halves for a Lipschitz function, stays at one across a jump";
+
+  /* ================= 4. The off-design magnitude =================
+     Separate from whether the relation is finite: is it a sensible TORQUE? Compared against the
+     rated torque, which is the only scale the machine has. */
+  final parameter Real offDesign_ratio=tau_low_absmax/tau_nom
+    "Largest off-design torque the relation returns, in units of the rated torque";
+
+  /* ---- Thresholds ----
+     Only two numbers are chosen here, and both are round-off bounds on exact identities rather
+     than physical tolerances. The off-design magnitude is deliberately NOT given a threshold:
+     it is reported and interpreted, because there is no defensible number to compare it to
+     without a measured torque characteristic. */
+  parameter Real tol_identity=1e-12 "Round-off bound on the exact identities";
+  parameter Real tol_affinity=1e-12
+    "Round-off bound on R0 = R1 along the affinity line, once the regularization factor is out";
+
+equation
+  when terminal() then
+    assert(err_nomInvariance < tol_identity, "R1 does not return the rated torque at the rated
+point. Measured ratio " + String(ratio_nom) + " against the predicted regularization factor " +
+      String(ratio_nom_predicted) + ", a departure of " + String(err_nomInvariance) + ". Since
+tau_hyd_nominal is DEFINED as the R1 relation evaluated at the rated point, anything but the
+regularization factor here means the two are not the same relation.", AssertionLevel.error);
+
+    assert(err_affinity_max < tol_affinity, "R0 and R1 disagree by up to " + String(
+      err_affinity_max) + " along the rated affinity line, after the known regularization factor
+is divided out. They are supposed to be the same function there: dp scales as w^2 and V as w, so
+dp*V/w scales as w^2, which is R0. A disagreement means R1 is not the generalization of R0 it is
+documented to be.", AssertionLevel.error);
+
+    assert(tau_low_absmax <= tau_bound*(1 + tol_identity), "The R1 torque reached " + String(
+      tau_low_absmax) + " N.m in the low speed sweep, above the ceiling " + String(tau_bound) +
+      " N.m that the regularization is supposed to impose. That ceiling is |P_shaft|/(2*w_reg),
+the extremum of w/(w^2+w_reg^2); exceeding it means the regularization is not doing its job.",
+      AssertionLevel.error);
+
+    assert(err_odd < tol_identity*max(tau_low_absmax, 1), "The R1 torque is not odd in the shaft
+speed: tau(-w) + tau(w) reaches " + String(err_odd) + " N.m. The head depends on the speed only
+through its square, so the hydraulic power is even and the torque must be exactly antisymmetric.
+A failure here is a sign error that would drive the shaft the wrong way through a reversal.",
+      AssertionLevel.error);
+
+    assert(abs(tau_atZero) < tol_identity, "The R1 torque at exactly zero speed is " + String(
+      tau_atZero) + " N.m rather than zero. The regularized reciprocal is odd and finite, so the
+torque at rest must vanish identically - this is the singularity the regularization exists to
+remove.", AssertionLevel.error);
+
+    assert(refineRatio < 0.75, "Doubling the resolution of the low speed torque sweep changed
+the largest step by a factor of " + String(refineRatio) + ". For a continuous relation that
+factor is 1/2, because the largest step is bounded by max|dtau/dw| times the grid spacing;
+across a discontinuity it stays at 1, because the jump is there on any grid. A value near 1
+means the torque really does jump somewhere in this interval.", AssertionLevel.error);
+
+  end when;
+
+  annotation (
+    experiment(StopTime=1, Tolerance=1e-6),
+    Documentation(info="<html>
+<h4>What this model is for</h4>
+<p>The R1 hydraulic torque is algebraic in the operating point, so a parameter sweep is the whole
+statement of what it does. This model sweeps it and asserts the properties it is supposed to
+have, before any plant transient is run against it.</p>
+<h4>What is asserted, and why each is an identity rather than a tolerance</h4>
+<table border=\"1\">
+<tr><th>Property</th><th>Why it must hold exactly</th></tr>
+<tr><td>rated point returns the rated torque</td>
+    <td><code>tau_hyd_nominal</code> is <i>defined</i> as this relation evaluated there, so the
+    only admissible difference is the regularization factor, which is known in closed form</td></tr>
+<tr><td>R0 = R1 on the affinity line</td>
+    <td>dp scales as w^2 and V as w, so dp*V/w scales as w^2, which is R0</td></tr>
+<tr><td>|tau| &lt;= |P_shaft|/(2*w_reg)</td>
+    <td>w/(w^2+w_reg^2) attains 1/(2*w_reg) at w = w_reg; this is what finite means here</td></tr>
+<tr><td>tau(-w) = -tau(w)</td><td>the head depends on w only through w^2</td></tr>
+<tr><td>tau(0) = 0</td><td>the regularized reciprocal is odd</td></tr>
+<tr><td>largest step halves under grid refinement</td>
+    <td>a Lipschitz function bounds the step by max|dtau/dw|*h; a jump does not shrink at all,
+    so the number compared against is 1/2 and comes from the definition of a derivative</td></tr>
+</table>
+<h4>A continuity test that was wrong first</h4>
+<p>Continuity was first tested by requiring the largest step of a uniform sweep to stay within
+10x the mean step. <b>That test was mis-posed and it failed on a provably smooth function.</b>
+The relation has a real narrow peak at <code>w = w_reg</code>, so on a grid that does not resolve
+the peak the largest step is legitimately many times the mean one - and refining the grid makes
+the ratio <i>worse</i> (15, 30, 43, 48 over four halvings), which is what shows it was measuring
+resolution rather than continuity. Refinement is the instrument that actually distinguishes the
+two, and it needs no tolerance.</p>
+<h4>What is NOT asserted</h4>
+<p><code>offDesign_ratio</code> - how large the torque gets away from the design line - is
+reported and left to interpretation. Bounding it would need a measured torque characteristic,
+and none is available; inventing a bound for it would be the kind of number this library does
+not carry.</p>
+</html>"));
+end Pump_R1_Torque;

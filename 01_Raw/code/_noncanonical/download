@@ -1,0 +1,166 @@
+within MSRE.Verification;
+model Pump_ZeroSpeed
+  "The fuel pump at rest is a passive resistance, not a head source"
+  extends Modelica.Icons.Example;
+
+  package Medium = MSRE.Media.FuelSalt_U235 "Fuel salt";
+
+  parameter Integer nPoints=41 "# of flow rates swept, odd so that zero is sampled exactly";
+  parameter SI.MassFlowRate m_flow_max=168 "Largest flow rate swept, the rated value";
+  parameter SI.Temperature T_test=908 "Fuel salt temperature";
+  parameter SI.AbsolutePressure p_test=1.5e5 "Suction pressure";
+  parameter Real N_test(unit="1/min") = 0 "Shaft speed. ZERO: that is what is being verified";
+
+  parameter SI.Pressure tol_zero=1e-9
+    "Allowed head at exactly zero flow. head = -R*regSquare(0) is zero identically, so this is
+     a round-off bound and not a physical tolerance";
+  parameter SI.Power tol_power=1e-9
+    "Allowed POSITIVE hydraulic power delivered to the stream at any swept flow rate";
+
+  final parameter MSRE.Data.Geometry geometry "Plant geometry";
+
+  /* The sweep is done on a STATIC characteristic, evaluated from the component's own parameters
+     at nPoints flow rates. It is not a simulation of a transient: the head law is algebraic in
+     V_flow and N, so a sweep is the complete statement of what the component does at N = 0. */
+  final parameter SI.Density d_test=Medium.density(Medium.setState_pTX(
+      p_test,
+      T_test,
+      Medium.X_default)) "Fuel salt density at the test state";
+
+  final parameter SI.MassFlowRate m_flows[nPoints]={m_flow_max*(1 - 2*(i - 1)/(nPoints - 1))
+      for i in 1:nPoints} "Swept flow rates, from +rated through zero to -rated";
+  final parameter SI.VolumeFlowRate V_flows[nPoints]={m_flows[i]/d_test for i in 1:nPoints}
+    "Swept volumetric flow rates";
+
+  /* Reproduced from MSRE.Components.BaseClasses.PartialFuelPump, from the same parameters. */
+  final parameter SI.Height head_nominal=geometry.dp_pump_nominal/(d_test*Modelica.Constants.g_n)
+    "Rated head";
+  final parameter SI.Height head_shutoff=geometry.headRatio_shutoff*head_nominal
+    "Shut-off head at rated speed";
+  final parameter SI.VolumeFlowRate V_flow_nominal=geometry.m_flow_nominal/d_test
+    "Rated volumetric flow";
+  final parameter Real R_pump(unit="s2/m5") = (geometry.headRatio_shutoff - 1)*head_nominal/
+      V_flow_nominal^2 "Quadratic resistance of the characteristic";
+  final parameter SI.VolumeFlowRate V_flow_small=0.01*V_flow_nominal
+    "Regularization width of the quadratic term";
+
+  final parameter Real heads[nPoints](each unit="m") = {head_shutoff*(N_test/geometry.N_pump_nominal)
+      ^2 - R_pump*Modelica.Fluid.Utilities.regSquare(V_flows[i], V_flow_small) for i in 1:
+      nPoints}
+    "Head at each swept flow rate, at the test speed. NOT typed SI.Height, which carries
+     min = 0: the whole point of this model is that these numbers are negative";
+  final parameter SI.Pressure dps[nPoints]={d_test*Modelica.Constants.g_n*heads[i] for i in 1:
+      nPoints} "Pressure RISE across the pump at each swept flow rate";
+
+  final parameter Integer iZero=integer((nPoints + 1)/2) "Index of the zero-flow point";
+  final parameter SI.Pressure dp_atZero=dps[iZero] "Pressure rise at exactly zero flow";
+  final parameter SI.Pressure dp_atRated=dps[1] "Pressure rise at rated forward flow";
+  final parameter SI.Pressure dp_atReverse=dps[nPoints] "Pressure rise at rated reverse flow";
+
+  /* ---- What a resistance actually is ----
+     dp is defined as p_b - p_a, and regSquare is ANTI-symmetric, so at N = 0 the characteristic
+     head = -R_pump*regSquare(V_flow) is an ODD function of the flow: negative in forward flow
+     and positive in reverse flow. That is correct and it is what a resistance does - the
+     pressure always falls in the direction the fluid is moving. The invariant is therefore NOT
+     that dp is negative, which only holds in forward flow, but that the component never puts
+     energy into the stream. */
+  final parameter SI.Power Ws[nPoints]={V_flows[i]*dps[i] for i in 1:nPoints}
+    "Hydraulic power delivered TO the stream at each swept flow rate. A resistance dissipates,
+     so every entry must be negative or zero whichever way the flow runs";
+  final parameter SI.Power W_max=max(Ws)
+    "Largest power delivered to the stream anywhere in the sweep";
+
+  /* Anti-symmetry. A passive resistance is direction-blind: reversing the flow reverses the
+     pressure difference and changes nothing else. */
+  final parameter SI.Pressure err_antisymmetry=max({abs(dps[i] + dps[nPoints + 1 - i]) for i in
+      1:iZero}) "Largest departure from dp(-V) = -dp(+V) over the sweep";
+  final parameter SIadd.NonDim err_antisymmetry_rel=err_antisymmetry/abs(dp_atRated)
+    "The same, relative to the head at rated flow";
+
+  /* Monotonicity. dp must fall strictly as the flow rises, everywhere, with no flat or rising
+     stretch. The sweep runs from +rated at i = 1 to -rated at i = nPoints, so V_flow DECREASES
+     with i and dp must therefore INCREASE with i throughout. */
+  final parameter Integer nViolations=sum({(if dps[i] <= dps[i - 1] then 1 else 0) for i in 2:
+      nPoints}) "# of swept intervals over which dp fails to rise as the flow falls";
+
+equation
+  when terminal() then
+    /* ---- 1. The pump never drives the stream ---- */
+    assert(W_max < tol_power, "At " + String(N_test) + " rpm the fuel pump delivers up to " +
+      String(W_max) + " W to the fuel salt somewhere in the sweep. With the shaft at rest the
+head law reduces to head = -R_pump*regSquare(V_flow), which is dissipative at every flow rate:
+V_flow*dp is negative in forward flow and in reverse flow alike. A positive value means the
+idle pump supplies driving power, and any natural circulation result obtained with it would be
+forced circulation under another name.", AssertionLevel.error);
+
+    /* ---- 2. Zero head at zero flow ---- */
+    assert(abs(dp_atZero) < tol_zero, "At zero flow and zero speed the pump develops " +
+      String(dp_atZero) + " Pa. Both terms of the head law vanish identically there, so this is
+a defect in the regularization rather than a tolerance question.", AssertionLevel.error);
+
+    /* ---- 3. Direction-blind resistance ---- */
+    assert(err_antisymmetry_rel < 1e-12, "The head at -V and the negated head at +V differ by up
+to " + String(err_antisymmetry) + " Pa, a relative " + String(err_antisymmetry_rel) + ". A
+passive resistance opposes the flow equally in both directions, so dp must be an odd function of
+the flow; a departure from that would act as a rectifier and would bias the direction the loop
+chooses to circulate in.", AssertionLevel.error);
+
+    /* ---- 4. Strictly monotone ---- */
+    assert(nViolations == 0, "dp fails to rise as the flow falls over " + String(nViolations) +
+      " of the " + String(nPoints - 1) + " swept intervals. A resistance must oppose the flow
+more strongly the faster it runs; a flat or rising stretch is a non-positive differential
+resistance and would let the loop momentum balance have more than one solution.",
+      AssertionLevel.error);
+
+  end when;
+
+  annotation (
+    experiment(StopTime=1),
+    Documentation(info="<html>
+<h4>What this answers</h4>
+<p>The natural circulation model
+<a href=\"modelica://MSRE.Verification.NaturalCirculation_TH\">NaturalCirculation_TH</a> leaves
+the fuel pump in the loop and sets its speed to zero. That is only legitimate if the pump at
+rest behaves as a piece of pipe with a resistance in it. This model verifies that directly,
+from the pump's own parameters, before any loop result is interpreted.</p>
+
+<h4>Why it is a parameter sweep and not a transient</h4>
+<p>The head law</p>
+<pre>
+  head = head_shutoff*(N/N_nominal)^2 - R_pump*regSquare(V_flow, V_flow_small)
+</pre>
+<p>is algebraic in <code>N</code> and <code>V_flow</code>. At <code>N = 0</code> the first term
+vanishes identically, so the whole characteristic is one function of one variable and a sweep
+over that variable is the <b>complete</b> statement of what the component does. Running a
+transient would sample the same function at whatever points the integrator happened to choose
+and would prove less.</p>
+
+<h4>What is checked</h4>
+<table border=\"1\">
+<tr><th>#</th><th>Check</th><th>Why it must hold</th></tr>
+<tr><td>1</td><td><code>V_flow*dp &lt;= 0</code> everywhere</td>
+    <td>a pump at rest may dissipate energy, never supply it</td></tr>
+<tr><td>2</td><td>the head vanishes at zero flow</td>
+    <td>both terms of the law are zero there</td></tr>
+<tr><td>3</td><td><code>dp(-V) = -dp(+V)</code></td>
+    <td>a passive resistance is direction-blind; a departure would act as a rectifier and bias
+    which way the loop chooses to circulate</td></tr>
+<tr><td>4</td><td><code>dp</code> falls strictly with <code>V_flow</code></td>
+    <td>a non-positive differential resistance would admit multiple solutions of the momentum
+    balance</td></tr>
+</table>
+<p><b>Check 1 is not a statement that the head is negative.</b> <code>dp</code> is <code>p_b - p_a</code> and
+<code>regSquare</code> is anti-symmetric, so at <code>N = 0</code> the head is negative in
+forward flow and <b>positive in reverse flow</b> - which is exactly what a resistance does,
+since the pressure falls in whichever direction the fluid is moving. Asserting a negative
+<code>dp</code> would therefore fail on correct behaviour. The invariant that holds in both
+directions is the power one.</p>
+
+<h4>Relation to the loop model</h4>
+<p>Check 1 here is the static counterpart of check 1 of
+<code>NaturalCirculation_TH</code>, which asserts the same power invariant on the assembled loop
+at the one operating point it settles at. This model covers the whole characteristic; that one covers
+the point actually reached. Both are needed: passing here does not prove the component was
+wired into the loop with the speed input actually held at zero.</p>
+</html>"));
+end Pump_ZeroSpeed;

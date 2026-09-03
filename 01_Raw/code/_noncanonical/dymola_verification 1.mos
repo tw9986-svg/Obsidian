@@ -1,0 +1,184 @@
+#!/bin/sh
+# Re-apply every sandbox workaround needed to compile this library with
+# OpenModelica 1.27.0.  NOTHING here touches the MSRE repository: every edit is
+# made to a *copy* of the TRANSFORM library, and a .orig file is kept beside each
+# patched file so the change can be undone or inspected.
+#
+#   usage:  tools/apply_sandbox_workarounds.sh /path/to/TRANSFORM-Library
+#
+# The workarounds fall into two classes, deliberately kept distinct:
+#
+#   OPENMODELICA_DEFECT  - OMC emits invalid C, or rejects what Dymola accepts.
+#                          The Modelica source is fine; the compiler is not.
+#   TRANSFORM_DEFECT     - the Modelica source itself is wrong. Dymola would
+#                          reject it too.
+#
+# This script exists because these workarounds were silently lost when the
+# container was recycled between phases, and every loop-level model then failed
+# to *build* rather than to solve.  See docs/PHASE_LOG.md, open item O-30.
+
+set -e
+ROOT="${1:?usage: $0 /path/to/TRANSFORM-Library}"
+T="$ROOT/TRANSFORM"
+[ -d "$T" ] || { echo "not a TRANSFORM library: $ROOT" >&2; exit 1; }
+
+backup() { [ -f "$1.orig" ] || cp "$1" "$1.orig"; }
+say()    { printf '  %-58s %s\n' "$1" "$2"; }
+
+echo "Applying sandbox workarounds to $T"
+
+# ---------------------------------------------------------------- 1,3  OPENMODELICA_DEFECT
+# scalarToColor generates real_get(literal, index_spec_t), which is invalid C.
+# dynColor is a purely cosmetic icon colour, so it is frozen to a constant.
+for f in "$T/Utilities/Visualizers/IconColorMap.mo" \
+         "$T/Utilities/Visualizers/IconColorMap_1D.mo" \
+         "$T/HeatExchangers/GenericDistributed_HX.mo" \
+         "$T/HeatExchangers/GenericDistributed_HX_Rwall.mo" \
+         "$T/HeatExchangers/GenericDistributed_HX_withMass.mo"; do
+  [ -f "$f" ] || continue
+  backup "$f"
+  python3 - "$f" <<'PY'
+import re, sys
+p = sys.argv[1]; s = open(p).read()
+note = ' /* SANDBOX WORKAROUND: OMC 1.27.0 scalarToColor codegen defect; cosmetic icon colour frozen. Restore .orig to undo. */'
+s2 = re.sub(r'Modelica\.Mechanics\.MultiBody\.Visualizers\.Colors\.scalarToColor\([^;]*?\)\s*;',
+            '{0.0, 127.0, 255.0};' + note, s)
+s2 = re.sub(r'^(\s*)dynColor\[i,:\]\s*=\s*\{0\.0, 127\.0, 255\.0\};',
+            r'\1dynColor[i,:] = {0.0, 127.0, 255.0};', s2, flags=re.M)
+open(p, 'w').write(s2)
+PY
+  say "$(basename "$f")" "scalarToColor frozen   [OPENMODELICA_DEFECT]"
+done
+
+# ---------------------------------------------------------------- 2  OPENMODELICA_DEFECT
+# OMC inlines the linspace reduction with an internal counter named _i, which
+# shadows the outer loop index of the same name and indexes y[4,.] on a y[3,20].
+f="$T/Math/linspace_2Dedge.mo"
+if [ -f "$f" ] && ! grep -q 'iRow' "$f"; then
+  backup "$f"
+  python3 - "$f" <<'PY'
+import sys
+p = sys.argv[1]; s = open(p).read()
+old = """  for i in 2:n1 - 1 loop
+    for j in 2:n2 - 1 loop
+      row := linspace(
+        y[i, 1],
+        y[i, n2],
+        n2);
+      col := linspace(
+        y[1, j],
+        y[n1, j],
+        n1);
+      y[i, j] := 0.5*(row[j] + col[i]);
+    end for;
+  end for;
+"""
+new = """  /* SANDBOX WORKAROUND: OMC 1.27.0 inlines the linspace() reductions below using an
+     internal C counter named _i, which shadows an outer loop index also named i.
+     Renaming to iRow/jCol removes the collision without changing the mathematics. */
+  for iRow in 2:n1 - 1 loop
+    for jCol in 2:n2 - 1 loop
+      row := linspace(
+        y[iRow, 1],
+        y[iRow, n2],
+        n2);
+      col := linspace(
+        y[1, jCol],
+        y[n1, jCol],
+        n1);
+      y[iRow, jCol] := 0.5*(row[jCol] + col[iRow]);
+    end for;
+  end for;
+"""
+assert old in s, "linspace_2Dedge: pattern not found"
+open(p, 'w').write(s.replace(old, new, 1))
+PY
+  say "Math/linspace_2Dedge.mo" "loop index renamed     [OPENMODELICA_DEFECT]"
+fi
+
+# ---------------------------------------------------------------- 4  OPENMODELICA_DEFECT (spec strictness)
+# Array modification without 'each'. Dymola accepts it, OMC rejects it.
+f="$T/Fluid/ClosureRelations/Geometry/Models/DistributedVolume_1D/HeatExchanger/GenericHX.mo"
+if [ -f "$f" ] && grep -q 'drs\[nR,nV\](min=0)' "$f"; then
+  backup "$f"
+  sed -i 's|input SI.Length drs\[nR,nV\](min=0)|input SI.Length drs[nR,nV](each min=0)|' "$f"
+  say "…/HeatExchanger/GenericHX.mo" "each min=0            [OPENMODELICA_DEFECT]"
+fi
+
+# ---------------------------------------------------------------- 5  TRANSFORM_DEFECT
+# The traceDynamics == SteadyState branch omits the relation that defines
+# mCs_scaled, which the else branch supplies. Without it the scaled variable has
+# no defining equation and the model is under-determined by nV*nC equations
+# (measured: 372 = 62 volumes x 6 precursor groups on the MSRE primary loop).
+# The line added below is the else branch's relation rearranged: same
+# mathematics, no new physics.
+f="$T/Fluid/Pipes/BaseClasses/PartialDistributedVolume.mo"
+if [ -f "$f" ] && ! grep -q 'mCs_scaled\[i, :\] = mCs\[i, :\] ./ Medium.C_nominal' "$f"; then
+  backup "$f"
+  python3 - "$f" <<'PY'
+import sys
+p = sys.argv[1]; s = open(p).read()
+old = """  if traceDynamics == Dynamics.SteadyState then
+    for i in 1:nV loop
+      zeros(Medium.nC) = mCbs[i, :];
+    end for;"""
+new = """  if traceDynamics == Dynamics.SteadyState then
+    for i in 1:nV loop
+      zeros(Medium.nC) = mCbs[i, :];
+      /* SANDBOX WORKAROUND (TRANSFORM_DEFECT): this branch omitted the relation defining
+         mCs_scaled, which the else branch supplies as mCs = mCs_scaled.*C_nominal. mCs is
+         already fixed unconditionally by mCs[i,:] = ms[i].*Cs[i,:], so that omitted line is
+         the scaled variable's only definition and the model is otherwise under-determined by
+         nV*nC equations. Same relation, rearranged; no new physics. */
+      mCs_scaled[i, :] = mCs[i, :] ./ Medium.C_nominal;
+    end for;"""
+assert old in s, "PartialDistributedVolume: pattern not found"
+open(p, 'w').write(s.replace(old, new, 1))
+PY
+  say "…/BaseClasses/PartialDistributedVolume.mo" "mCs_scaled defined    [TRANSFORM_DEFECT]"
+fi
+
+echo "Done. Every patched file has a .orig beside it."
+echo
+echo "Runtime flags still required for loop-level models (solver settings, not model changes):"
+echo "    -noHomotopyOnFirstTry    global homotopy fails on the loop initialization"
+echo "    -nlssMaxDensity=0.0      forces the dense NLS; KINSOL/KLU reports no sparsity pattern"
+echo
+echo "Note: -override=stopTime=... and -override=tolerance=... are SILENTLY IGNORED by the"
+echo "OMC runtime. Edit the generated _init.xml instead, or the experiment will look unchanged."
+
+# ---------------------------------------------------------------------------
+# 6. OPENMODELICA_O33_DIAGNOSTIC_WORKAROUND
+#
+#    CLASS: tool-specific diagnostic workaround. NOT a physics correction, NOT
+#    a medium property change, NOT a calibration, NOT a new baseline, and it
+#    must never be carried into Dymola or into the repository physics source.
+#
+#    WHAT IT CHANGES: two start attributes in the Modelica Standard Library,
+#    Modelica/Media/package.mo, inside Modelica.Media.Interfaces.Types:
+#
+#      type Temperature      ... start=288.15  ->  start=908
+#      type AbsolutePressure ... start=1.e5    ->  start=1.5e5
+#
+#    min, max and nominal are deliberately NOT touched - the change is the
+#    Newton seed and nothing else.
+#
+#    WHY: ThermodynamicState is built from those two types, and the pipe
+#    end-face states (GenericPipe_MultiTransferSurface.statesFM, declared
+#    protected with no start attribute) inherit them. The start value is
+#    hard-coded in the type and is independent of the medium's T_default, so
+#    no MSRE-side declaration can reach it. At 288.15 K the fuel salt is far
+#    outside the range its correlations are fitted over and the KLU setup
+#    fails. See docs/PHASE_LOG.md phase 30 section F and phase 31 section D.
+#
+#    A start value cannot change a converged solution. If any steady result
+#    moves, that is a finding about the model, not a success of this patch,
+#    and the correct response is to stop - see O33_WORKAROUND_STEADY_INVARIANCE.
+# ---------------------------------------------------------------------------
+apply_o33_seed_workaround() {
+  f="$MSL/Modelica/Media/package.mo"
+  [ -f "$f.orig" ] || cp "$f" "$f.orig"
+  sed -i 's/^        start=288\.15) "Type for temperature with medium specific attributes";/        start=908) "Type for temperature with medium specific attributes";/' "$f"
+  sed -i 's/^        start=1\.e5)$/        start=1.5e5)/' "$f"
+  echo "  6. OPENMODELICA_O33_DIAGNOSTIC_WORKAROUND applied to $f"
+}

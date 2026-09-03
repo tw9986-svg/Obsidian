@@ -1,0 +1,114 @@
+within MSRE.Verification.ORNL0378;
+model RadialShapeVerification
+  "SHAPE_ONLY_VERIFICATION of the radial graphite-fuel temperature difference against ORNL-TM-0378 Fig. 13"
+  extends Modelica.Icons.Example;
+
+  parameter HistoricalData data;
+  parameter Integer n=21 "# of digitized stations, r = 4 .. 24 in at 1 in spacing";
+
+  /* ---- ORNL-TM-0378 Fig. 13, printed p.42, digitized by tools/digitize_ornl0378.py ----
+     "Radial Temperature Profiles in MSRE Core Near Midplane", 10 Mw, NO fuel soakup.
+     Both curves are transverse means (p.41), so their difference IS the report's DT.
+     These numbers are machine-tracked from the page image, NOT read by eye: an earlier
+     eye reading of the graphite curve was up to 7 F high over r = 15 .. 22 in, which is
+     small on a 1280 F ordinate but large on a 30 F difference. */
+  final parameter Real r_in[n]={4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0,17.0,
+      18.0,19.0,20.0,21.0,22.0,23.0,24.0};
+  final parameter Real Tg_F[n]={1277.95,1281.20,1283.12,1283.75,1283.44,1282.11,1280.05,1277.12,
+      1274.09,1270.64,1266.61,1262.19,1257.51,1252.57,1247.01,1241.45,1236.19,1230.24,1223.85,
+      1217.81,1211.47} "FIGURE_DERIVED, stringer-mean graphite";
+  final parameter Real Tf_F[n]={1219.63,1220.78,1221.35,1221.31,1221.05,1220.52,1219.73,1218.60,
+      1217.37,1215.76,1214.07,1212.15,1210.11,1208.12,1205.92,1203.56,1201.37,1198.57,1196.35,
+      1193.86,1191.24} "FIGURE_DERIVED, adjacent-channel mean fuel";
+  final parameter Real dT_F[n]={Tg_F[i] - Tf_F[i] for i in 1:n};
+  final parameter Real dT_max_F=max(dT_F);
+
+  /* ---- The source shape: ORNL-TM-0378 Fig. 4, printed p.20, same tool ----
+     Printed ordinate is already "FRACTION OF MAX. VALUE", so nothing is rescaled here. */
+  final parameter Real A[n]={0.9396,0.9730,0.9925,0.9988,0.9932,0.9821,0.9641,0.9379,0.9109,
+      0.8760,0.8389,0.7975,0.7541,0.7069,0.6608,0.6127,0.5585,0.5065,0.4506,0.3904,0.3302}
+    "FIGURE_DERIVED, fuel fission density";
+  final parameter Real A_max=max(A);
+
+  /* ---- The comparison. At a FIXED plane, Eq. (18) with the separability of Eq. (2) gives
+              DT(r,z*)/DT(r_peak,z*) = A(r)/A(r_peak)
+     because B(z*) appears in numerator and denominator alike and CANCELS. No absolute
+     specific power and no thermal normalization constant enters this test.
+
+     The two figures are drawn in DIFFERENT planes - Fig. 4 at the plane of maximum slow
+     flux, 35 in, and Fig. 13 near the midplane, 32.30 in - and that is precisely what the
+     cancellation of B(z*) makes harmless. Eq. (2) is not our assumption; the report states
+     it on p.32: "It is further assumed that the radial and axial variations in the
+     power-density distribution are separable". ---- */
+  /* Declared as variables rather than parameters so that they are written to the result
+     file; a final parameter is constant-folded away and cannot be inspected afterwards. */
+  Real dT_norm[n];
+  Real A_norm[n];
+  Real dev[n];
+  Real rmse "Root-mean-square normalized deviation";
+  Real dev_absmax "Largest normalized deviation at any station";
+  Real dev_mean "Signed mean. A bias here would be a missing physical term";
+  Integer nWithinBand "Stations inside the pre-declared band";
+
+  parameter Real tol_readBand=0.0554
+    "The band declared BEFORE the first radial comparison was run, propagated from the
+     eye-reading uncertainties then in force (+-1.5 F on each temperature curve, +-0.02 on
+     the fission-density curve). It is deliberately NOT tightened to match the better
+     machine digitization: keeping the original band is what makes this a pass rather than
+     a re-scored test.";
+
+equation
+  dT_norm = {dT_F[i]/dT_max_F for i in 1:n};
+  A_norm = {A[i]/A_max for i in 1:n};
+  dev = {dT_norm[i] - A_norm[i] for i in 1:n};
+  rmse = sqrt(sum(dev[i]^2 for i in 1:n)/n);
+  dev_absmax = max({abs(dev[i]) for i in 1:n});
+  dev_mean = sum(dev)/n;
+  nWithinBand = sum({(if abs(dev[i]) <= tol_readBand then 1 else 0) for i in 1:n});
+
+  when terminal() then
+    assert(rmse < tol_readBand, "RADIAL_SHAPE_FAIL. The normalized radial shape of the digitized
+graphite-fuel difference departs from A(r)/A(r_peak) with an RMSE of " + String(rmse) + ", beyond
+the pre-declared band (" + String(tol_readBand) + "). In a fixed plane Eq. (18) makes these two
+identical, so a failure here is a failure of the source shape or of the digitization - not of any
+absolute normalization, since none is used.", AssertionLevel.error);
+
+    assert(nWithinBand == n, "RADIAL_SHAPE_FAIL. Only " + String(nWithinBand) + " of " + String(n) +
+      " stations lie within the pre-declared band.", AssertionLevel.error);
+
+    assert(abs(dev_mean) < 0.25*tol_readBand, "RADIAL_SHAPE_FAIL. The mean SIGNED deviation is " +
+      String(dev_mean) + ". A bias against a symmetric band is a missing physical term, not
+reading error - which is exactly the signature a differing graphite deposition shape would
+leave.", AssertionLevel.error);
+  end when;
+
+  annotation (
+    experiment(StopTime=1, Tolerance=1e-6),
+    Documentation(info="<html>
+<h4>REFERENCE</h4>
+<p>ORNL-TM-0378 Fig. 13 (p.42) against Fig. 4 (p.20), through Eq. (2) and Eq. (18).</p>
+
+<h4>WHAT THIS TESTS, AND WHAT IT CANNOT</h4>
+<p>Only the <b>normalized radial shape</b>. Both sides are divided by their own peak, so the
+absolute power normalization - the quantity that Phase 46C found irreproducible, and which is
+still <code>SOURCE_MAPPING_UNRESOLVED</code> - cancels and is not exercised. Passing this test
+therefore <b>cannot</b> resolve that quantity, and must not be quoted as if it did.</p>
+
+<h4>WHY EQ. (18) PREDICTS A SINGLE SHAPE</h4>
+<p>Expanding Eq. (13) exactly gives
+<code>dT_fuel = (r_w^2/(48 k_f)) (3 P_f + 22 q_w/r_w)</code>, so <code>DT</code> is a linear
+combination of a fuel-fission term (78.7 % at the 10 Mw point) and two graphite-driven terms
+(21.3 %). Eq. (18) collapses that to one shape only because the report assigns the graphite
+heating the same spatial distribution as the fission power density - stated on p.31: <q>Since the
+heat production in the graphite is small, no great error is introduced by assigning the same
+spatial distribution to this term.</q> This test is therefore a test of that assumption as much
+as of the arithmetic, and it passes.</p>
+
+<h4>DIGITIZATION</h4>
+<p>Both figures are machine-tracked by <code>tools/digitize_ornl0378.py</code> from the page
+images at 300 dpi, with the axis calibration checked against the printed gridlines. The earlier
+eye reading of Fig. 13 was wrong by up to 7 F on the graphite curve and produced a spurious
+failure of this same test; reading the <i>difference</i> of two nearly parallel curves by eye is
+much less accurate than reading either one, and its error is systematic rather than random.</p>
+</html>"));
+end RadialShapeVerification;

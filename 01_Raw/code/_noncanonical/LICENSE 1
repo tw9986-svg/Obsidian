@@ -1,0 +1,99 @@
+within MSRE.Verification;
+model SemiLinear_ZeroCrossing
+  "O-24 | What semiLinear actually does at zero flow, measured on its own"
+  extends Modelica.Icons.Example;
+
+  /* ------------------------------------------------------------------
+     The donor-cell upwind operator, in isolation.
+
+     TRANSFORM's GenericPipe_MultiTransferSurface writes, at every interior
+     segment boundary i:
+
+       H_flows[i]     = semiLinear(m_flows[i], mediums[i-1].h,  mediums[i].h)
+       mXi_flows[i,:] = semiLinear(m_flows[i], mediums[i-1].Xi, mediums[i].Xi)
+       mC_flows[i,:]  = semiLinear(m_flows[i], Cs[i-1,:],       Cs[i,:])
+
+     Three transported quantities - enthalpy, species, trace substance - but all
+     three share the SAME switching argument m_flows[i]. So a segment boundary
+     contributes three upwind expressions and ONE zero-crossing condition, not
+     three. Getting that right matters for counting.
+     ------------------------------------------------------------------ */
+
+  parameter SI.MassFlowRate m_amplitude=1.0 "Amplitude of the imposed flow oscillation";
+  parameter SI.Frequency f=1.0 "Frequency; the flow crosses zero twice per period";
+  parameter SI.SpecificEnthalpy h_upstream=1.30e6 "Donor value for positive flow";
+  parameter SI.SpecificEnthalpy h_downstream=1.35e6
+    "Donor value for negative flow. DIFFERENT from h_upstream on purpose: if the two donors were
+     equal, semiLinear would be linear and the switching would be invisible";
+
+  SI.MassFlowRate m_flow "Imposed flow, swept through zero";
+  /* A state is essential. Without one the model has no dynamics, DASSL has nothing to
+     integrate, and it reports zero state events regardless of what the operator does - which
+     says nothing about the operator. Integrating the flux gives the integrator something whose
+     error estimate depends on the derivative that jumps. */
+  SI.Energy E(start=0, fixed=true) "Time integral of the upwind flux; exists to create a state";
+  SI.Energy E_noEvent(start=0, fixed=true) "The same for the event-suppressed flux";
+  SI.EnthalpyFlowRate H_flow "Upwind enthalpy flux, exactly as the pipe forms it";
+  SI.EnthalpyFlowRate H_flow_noEvent "The same with the event suppressed";
+  SI.SpecificEnthalpy h_donor "Which donor is actually selected";
+
+  /* The derivative jump. semiLinear is CONTINUOUS in value at x = 0 - both
+     branches give zero - but its slope is h_upstream for x > 0 and h_downstream
+     for x < 0. So it is C0 and NOT C1 whenever the donors differ, and the size
+     of the kink is exactly the donor difference. */
+  final parameter SI.SpecificEnthalpy dh_kink=h_upstream - h_downstream
+    "Slope discontinuity of semiLinear at zero flow [J/kg]";
+
+equation
+  m_flow = m_amplitude*sin(2*Modelica.Constants.pi*f*time);
+
+  H_flow = semiLinear(m_flow, h_upstream, h_downstream);
+  H_flow_noEvent = noEvent(semiLinear(m_flow, h_upstream, h_downstream));
+  h_donor = noEvent(if m_flow >= 0 then h_upstream else h_downstream);
+  der(E) = H_flow;
+  der(E_noEvent) = H_flow_noEvent;
+
+  annotation (
+    experiment(StopTime=5, Tolerance=1e-6),
+    Documentation(info="<html>
+<h4>Purpose</h4>
+<p>Open item <b>O-24</b>. The full-loop chattering was localized to
+<code>msre.pumpBowl.pipe.m_flows[2] &gt;= 0.0</code>, which is the switching condition of the
+<code>semiLinear</code> donor-cell upwind scheme. This model measures what that operator does at
+zero flow with nothing else present, so that its behaviour is established independently of the
+loop.</p>
+
+<h4>What semiLinear is</h4>
+<p><code>semiLinear(x, p, n)</code> is <code>if x &gt;= 0 then p*x else n*x</code>. At
+<code>x = 0</code> both branches give zero, so the <b>value is continuous</b>. The <b>slope is
+not</b>: it is <code>p</code> above zero and <code>n</code> below. The function is therefore
+<b>C0 but not C1</b> whenever the two donors differ, and the size of the kink is exactly
+<code>p - n</code>.</p>
+
+<h4>Why noEvent is not a free fix - correcting an earlier claim</h4>
+<p>An earlier note in this log suggested that because <code>semiLinear</code> is continuous at
+zero, wrapping it in <code>noEvent</code> would be mathematically sound. <b>That reasoning was
+wrong.</b> Continuity of the value is not the relevant property: the integrator's error estimate
+depends on the <i>derivative</i>, and that is exactly what jumps. An event at a derivative
+discontinuity is not an artefact to be suppressed - it is what lets the integrator restart
+cleanly on the other side. Suppressing it makes the solver step blindly across a kink.</p>
+
+<p><code>H_flow</code> and <code>H_flow_noEvent</code> are both computed here, and both are
+integrated, so the difference is a measured quantity rather than an argument.</p>
+
+<h4>The model must have a state</h4>
+<p>A first version of this model had none, and reported zero state events. That result was an
+<b>artefact</b>: with no differential equations DASSL has nothing to integrate and never consults
+a zero-crossing, whatever the operator does. <code>E</code> and <code>E_noEvent</code> integrate
+the two fluxes so that the integrator's error estimate genuinely depends on the derivative that
+jumps. A test that cannot fail proves nothing.</p>
+
+<h4>What this reframes</h4>
+<p>If the events themselves were the problem, a flow crossing zero cleanly would be expensive
+here too. If instead this model crosses zero cheaply, then the events are legitimate and the
+full-loop chattering - 100 crossings inside 5.6 microseconds - means the loop's flow variable is
+<b>oscillating around zero rather than genuinely reversing</b>. In that case
+<code>semiLinear</code> is the messenger and the cause lies in the algebraic system or its
+scaling. The distinction decides where to look next, and it is not one to guess at.</p>
+</html>"));
+end SemiLinear_ZeroCrossing;

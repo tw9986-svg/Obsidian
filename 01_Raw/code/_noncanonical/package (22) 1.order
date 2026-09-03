@@ -1,0 +1,231 @@
+# Dymola B0 baseline — fixed reference results
+
+**These values were produced by the user's local Dymola.** They are the authoritative baseline.
+They must never be replaced by, or conflated with, an OpenModelica result, and they are preserved
+permanently so that every future model change can be measured against them.
+
+Tool roles, fixed:
+
+| Tool | Role |
+|---|---|
+| **OpenModelica** | pre-verification and sensitivity — as much as can be executed before Dymola |
+| **Dymola** | final physical confirmation and benchmark results |
+
+An OpenModelica backend crash is an `OPENMODELICA_TOOL_LIMITATION`, never a physics failure.
+Conversely, anything OpenModelica can verify is not deferred to Dymola.
+
+---
+
+## A. Loop_Hydraulics — Dymola B0
+
+DASSL, 0 → 300 s, terminated successfully, **0 state events**.
+
+| Quantity | Dymola B0 |
+|---|---:|
+| `m_flow` | 166.542 kg/s |
+| `m_flow_min` | 166.542 kg/s |
+| `Re_max` | 806.178 |
+| `dp_pump` | 3.01271 bar |
+| `dp_loop_nonstatic` | 3.01272 bar |
+| `dp_loop_gravity` | −1.20131e−5 bar (≈ −1.20 Pa) |
+| `dp_loop_total` | 5.82077e−16 bar |
+| `V_loop_measured` | 2.0965 m³ |
+| `V_loop_geometry` | 2.0965 m³ |
+| `M_loop_measured` | 4605 kg |
+| `err_inventory` | 2.22e−16 |
+| `tau_core` | 9.96316 s |
+| `tau_external` | 17.6879 s |
+| `tau_system` | 27.651 s |
+| `err_flowSplit` | 0 |
+
+Verdicts: steady hydraulics PASS · pressure closure PASS · inventory identity PASS ·
+flow split PASS · **core flow regime LAMINAR** · transit-time accounting PASS.
+
+## B. Jeong/MARS transit times
+
+| | Jeong/MARS | TRANSFORM B0 | difference |
+|---|---:|---:|---:|
+| `tau_core` | 9.56 s | 9.96316 s | |
+| `tau_external` | 16.14 s | 17.6879 s | |
+| `tau_system` | 25.70 s | 27.651 s | **+1.951 s, ≈ +7.6 %** |
+
+`JEONG_TRANSIT_TIME = BENCHMARK_DIFFERENCE`. The geometry is **not** to be forced to Jeong values
+except inside an explicitly named Jeong-equivalent sensitivity case.
+
+## C. PumpStartup1D_RotorDynamics — Dymola B0
+
+`Q_start` 100 W · `T_start` 908 K · `t_null` 600 s · `N_rated` 1160 rpm · `m_flow_nominal` 168 kg/s ·
+1 radial group × 20 axial · servo enabled · `FuelPump_Dynamics` · `tau_shaft` 4.0 s ·
+`tau_motor_nominal` ≈ `tau_hyd_nominal` ≈ 236.11 N·m · `tau_fric` = 0.
+
+Rotor law `N/N_nom = tanh(t_rel/4)`, `t_rel = t − 600 s`:
+
+| `t_rel` | N [rpm] |
+|---:|---:|
+| 2 s | 536.06 |
+| 4 s | 883.45 |
+| 8 s | 1118.27 |
+| 10 s | 1144.47 |
+| final | 1160 |
+
+`STARTUP_ROTOR_ODE` PASS · `TORQUE_BALANCE` PASS.
+
+## D. PumpStartup flow — Dymola B0
+
+| Quantity | Value |
+|---|---:|
+| `m_flow` at `t_rel` = 10 s | 164.51 kg/s |
+| 95 % nominal | ≈ 7.4 s |
+| 98 % nominal | ≈ 10.2 s |
+| 99 % nominal | ≈ 15.6 s |
+| final `m_flow` | ≈ 166.6 kg/s |
+| final `m_flow_norm` | ≈ 0.991 |
+| `dp_pump` at 10 s | ≈ 2.933 bar |
+| final `dp_pump` | ≈ 3.015 bar |
+
+Head response PASS · flow response PASS · steady endpoint consistent with Loop_Hydraulics B0.
+
+## E. PumpStartup reactivity — Dymola B0
+
+| Feature | TRANSFORM B0 | Jeong/MARS | MSRE experiment |
+|---|---:|---:|---:|
+| first peak | 15.4 s, 258.9 pcm | 15.3 s | |
+| first minimum | 29.2 s, 198.7 pcm | | |
+| second peak | 42.9 s, 231.0 pcm | 40.7 s | |
+| third peak | 70.4 s, 223.8 pcm | 66.2 s | |
+| oscillation period | ≈ 27.5 s | ≈ 25.5 s | |
+| 25–45 s average | ≈ 215.3 pcm | 222.4 pcm | 227.3 pcm |
+| 150 s | ≈ 220.9 pcm | 226.5 pcm (asymptotic) | |
+
+Sign and causal behaviour PASS · quantitative agreement `BENCHMARK_DIFFERENCE`.
+
+**Key structural observation.** In both models the oscillation period tracks the system transit
+time:
+
+```
+TRANSFORM   T_osc ≈ 27.5 s    tau_system 27.651 s
+Jeong       T_osc ≈ 25.5 s    tau_system 25.70 s
+```
+
+so the startup peak-timing difference is tied to the **hydraulic inventory / transit-time
+definition**, not to an obvious DNP transport defect.
+
+## F. PumpCoastdown1D_RotorDynamics — Dymola B0
+
+`t_null` 1500 s · StopTime 1800 s · pre-trip N ≈ 1160 rpm · pre-trip `m_flow` ≈ 166.5 kg/s ·
+`tau_shaft` 4.0 s · motor trip `u_motor` 1 → 0 at 1500 s.
+
+Rotor law `N/N0 = 1/(1 + t_rel/4)`. Verified: `t_rel` = 60 s gives N = 72.5 rpm, against
+1160/(1+60/4) = 72.5 rpm.
+
+Rotor ODE PASS · motor trip PASS · torque direction PASS · head decay trend PASS.
+
+## G. PumpCoastdown flow — Dymola B0
+
+Normalized flow [%]:
+
+| t [s] | TRANSFORM | MARS | Estimated |
+|---:|---:|---:|---:|
+| 1 | 78.9 | 80.3 | 95.7 |
+| 2 | 65.5 | 54.7 | 81.4 |
+| 4 | 48.8 | 29.7 | 42.0 |
+| 5 | 43.3 | 22.4 | 27.8 |
+| 10 | 27.5 | 6.57 | 7.03 |
+| 15 | 20.0 | 2.20 | 4.66 |
+| 20 | 15.7 | 0.97 | 3.81 |
+| 30 | 10.9 | 0.27 | — |
+| 40 | 8.34 | ≈ 0 | — |
+| 50 | 6.71 | ≈ 0 | — |
+| 60 | 5.61 | ≈ 0 | — |
+
+Qualitative response PASS · **quantitative agreement LARGE `BENCHMARK_DIFFERENCE`**: TRANSFORM
+decays substantially more slowly from 2 s onward.
+
+**DNP parameters must not be calibrated to compensate for this flow difference.**
+
+## H. PumpCoastdown reactivity — Dymola B0
+
+| t [s] | TRANSFORM [pcm] | MARS [pcm] | Measured [pcm] |
+|---:|---:|---:|---:|
+| 5 | −46.6 | −65.6 | −56.6 |
+| 10 | −90.2 | −118.9 | −114.0 |
+| 20 | −134.6 | −165.6 | −158.5 |
+| 30 | −156.7 | −186.4 | −172.1 |
+| 40 | −170.6 | −198.7 | −187.2 |
+| 50 | −180.4 | −207.1 | −200.5 |
+| 60 | −187.8 | −212.8 | −206.2 |
+
+TRANSFORM vs MARS: MAE ≈ 24.8 pcm, RMSE ≈ 25.8 pcm.
+TRANSFORM vs measured: MAE ≈ 19.3 pcm, RMSE ≈ 20.0 pcm.
+
+Sign PASS · trend PASS · quantitative `BENCHMARK_DIFFERENCE`.
+
+Causal chain: slow flow coastdown → excessive residual primary flow → DNP still transported out
+of the core → `Beta_eff` recovers too slowly → positive intrinsic flow reactivity develops too
+slowly → required rod compensation stays less negative than MARS and experiment. So
+
+```
+FLOW_ERROR -> DNP_RESIDENCE_ERROR -> REACTIVITY_ERROR
+```
+
+The Fig. 8 difference is **not** to be treated as an independent kinetics defect until the
+hydraulic coastdown difference is characterized.
+
+## I. Pump-model uncertainty at B0
+
+Assumptions: `tau_shaft` 4.0 s · hydraulic torque ≈ ω·|ω| · simplified operating-point dependence ·
+`tau_fric_coulomb` = 0 · `tau_fric_viscous` = 0 · off-design characteristic not fully validated ·
+rated point validated · low-speed/low-flow characteristic shows a benchmark difference.
+
+Candidates, in no assumed order: hydraulic torque formulation · zero mechanical friction · rotor
+inertia / `tau_shaft` · off-design head characteristic · low-flow loop resistance and form loss ·
+momentum formulation · transit-time / geometry difference · DNP spatial weighting.
+
+**The rotor ODE implementation is not a primary defect candidate** — it reproduces both analytic
+laws exactly. The question is the physical pump/system response obtained from it.
+
+---
+
+## J. Rules for comparing OpenModelica against this baseline
+
+1. Compare numerically against the B0 values above.
+2. Report absolute difference, relative difference, and trend agreement.
+3. Classify as `CROSS_TOOL_MATCH`, `CROSS_TOOL_SMALL_DIFFERENCE`, `CROSS_TOOL_DIFFERENCE`, or
+   `OPENMODELICA_TOOL_LIMITATION`.
+4. **Never replace a Dymola reference with an OpenModelica result.**
+5. On disagreement, do not tune. First establish whether the cause is initialization, solver,
+   event handling, medium state, dynamic formulation, or a real equation difference.
+6. Preserve these B0 values permanently.
+
+---
+
+## K. Cross-tool comparison — Loop_Hydraulics (Dymola B0 vs OpenModelica)
+
+OpenModelica 1.27.0, same model, same sandbox TRANSFORM patches. The Dymola column is the
+reference; the OpenModelica column is a pre-verification cross-check only.
+
+| Quantity | Dymola B0 (reference) | OpenModelica | rel. difference | class |
+|---|---:|---:|---:|---|
+| `m_flow` (kg/s) | 166.542 | 166.5420006 | 4e−9 | `CROSS_TOOL_MATCH` |
+| `Re_max` | 806.178 | 806.1779736 | 3e−8 | `CROSS_TOOL_MATCH` |
+| `dp_pump` (Pa) | 301271 | 301271.0734 | 2e−7 | `CROSS_TOOL_MATCH` |
+| `dp_loop_nonstatic` (Pa) | 301272 | 301272.273 | 9e−7 | `CROSS_TOOL_MATCH` |
+| `dp_loop_gravity` (Pa) | −1.20131 | −1.199578 | 1.4e−3 | `CROSS_TOOL_SMALL_DIFFERENCE` |
+| `V_loop_measured` (m³) | 2.0965 | 2.096499936 | 3e−8 | `CROSS_TOOL_MATCH` |
+| `M_loop_measured` (kg) | 4605 | 4605.001129 | 2e−7 | `CROSS_TOOL_MATCH` |
+| `err_inventory` | 2.22e−16 | −8.88e−16 | both ≈ 0 | `CROSS_TOOL_MATCH` |
+| `tau_core` (s) | 9.96316 | 9.96304429 | 1.2e−5 | `CROSS_TOOL_MATCH` |
+| `tau_external` (s) | 17.6879 | 17.68764511 | 1.4e−5 | `CROSS_TOOL_MATCH` |
+| `tau_system` (s) | 27.651 | 27.6506894 | 1.1e−5 | `CROSS_TOOL_MATCH` |
+
+Overall: **`CROSS_TOOL_MATCH`**.
+
+The one exception, `dp_loop_gravity`, is a residual sum of segment static heads around a closed
+loop. Its exact value is a cancellation of terms of order 1e5 Pa down to order 1 Pa, so a
+relative difference of 1.4e−3 on the *residual* corresponds to a relative difference of ~1e−8 on
+the *terms*. That is consistent with solver-tolerance and summation-order differences between the
+two tools and is not evidence of an equation difference. Classified
+`CROSS_TOOL_SMALL_DIFFERENCE`, cause `numerical cancellation`, no action.
+
+No model change is made on the basis of this comparison. The Dymola values in section A remain
+the reference.

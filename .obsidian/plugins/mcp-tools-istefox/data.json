@@ -1,0 +1,44 @@
+{
+  "toolLoading": {
+    "profile": "all",
+    "promoted": [],
+    "profiles": {
+      "default": {
+        "profile": "all",
+        "promoted": [],
+        "allowed": null
+      }
+    }
+  },
+  "mcpTransport": {
+    "tokens": [
+      {
+        "id": "default",
+        "label": "Default",
+        "token": "5VPGna7ww3fpl1k6JSA0uyIrrgnhOLHX1cXqvdPG_80",
+        "createdAt": 1788395375516
+      }
+    ],
+    "bearerToken": "5VPGna7ww3fpl1k6JSA0uyIrrgnhOLHX1cXqvdPG_80",
+    "livePort": 27200,
+    "eraCounters": {
+      "legacy": 29,
+      "modern": 3
+    },
+    "eraCountersByToken": {
+      "default": {
+        "legacy": 29,
+        "modern": 3
+      }
+    }
+  },
+  "semanticSearch": {
+    "provider": "auto",
+    "indexingMode": "live",
+    "unloadModelWhenIdle": false
+  },
+  "mcpClientConfig": {
+    "autoWriteClaudeDesktopConfig": false,
+    "autoWriteTokenId": null
+  }
+}

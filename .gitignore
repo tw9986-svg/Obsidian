@@ -1,0 +1,13 @@
+# ── Git 제외 대상 ─────────────────────────────────────────────
+# 원칙: 파일 자체는 로컬 01_Raw에 보존한다. Git에는 서지정보·hash·metadata만
+# (02_Wiki/sources/, 03_Data/) 기록해 Source → Data → Model 추적성을 유지한다.
+
+# 타인 계정 워터마크가 찍힌 사본 — 재배포 금지 (배포권 없음)
+01_Raw/literature/Dolan ed 2017 - Molten Salt Reactors and Thorium Energy (book, watermarked copy).pdf
+
+# Obsidian 작업 상태 (열려 있는 파일 목록 등, 연구 내용 아님)
+.obsidian/workspace.json
+
+# OS / 편집기 부산물
+Thumbs.db
+.DS_Store

@@ -1,0 +1,226 @@
+{
+  "main": {
+    "id": "955f0809181e730a",
+    "type": "split",
+    "children": [
+      {
+        "id": "301961a229bb6401",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "ca15242d06a90139",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "cad1ea3c750f9478",
+    "type": "split",
+    "children": [
+      {
+        "id": "7f082b1c14b3b7d1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "40fcbfd23baad836",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "964b7e89a90857c3",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "검색"
+            }
+          },
+          {
+            "id": "0cfff9e9dfd3cc86",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "북마크"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "151f89f24f3da4ea",
+    "type": "split",
+    "children": [
+      {
+        "id": "73b08f0faf5829d0",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "827dc1c1fb53141c",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "백링크"
+            }
+          },
+          {
+            "id": "6c2decb741800e7a",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "나가는 링크"
+            }
+          },
+          {
+            "id": "cf5a82e828ca4c1e",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "태그"
+            }
+          },
+          {
+            "id": "87ac1d7f1b6b7e7d",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "모든 속성"
+            }
+          },
+          {
+            "id": "3b4f2ac0dacc7434",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "무제.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "개요"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "ca15242d06a90139",
+  "lastOpenFiles": [
+    "raw/GPT Gemini 연동 방법.md",
+    "raw/‎Google Gemini.md",
+    "00_Inbox/Untitled.base",
+    "raw",
+    "index.md",
+    "02_Wiki/issues/beta-eff-circulating-discrepancy.md",
+    "02_Wiki/reviews/2026-09-03-inbox-raw-code-classification.md.tmp.2800.8f2e7ca4e57e",
+    "02_Wiki/reviews/2026-09-03-inbox-raw-code-classification.md.tmp.2800.43fab9e3e0ae",
+    "02_Wiki/reviews/2026-09-03-inbox-raw-code-classification.md.tmp.2800.0893f41c388b",
+    "02_Wiki/reviews/2026-09-03-inbox-raw-code-classification.md.tmp.2800.833c3fd38123",
+    "02_Wiki/reviews/2026-09-03-inbox-raw-code-classification.md.tmp.2800.eac835128fa8",
+    "CLAUDE.md.tmp.2800.1bcd28c7a67c",
+    "CLAUDE.md.tmp.2800.000c42a06fcc",
+    "00_Inbox/README.md",
+    "00_Inbox/README.md.tmp.2800.35d0ae37a2ce",
+    "02_Wiki/classification-axes.md",
+    "02_Wiki/sources/dolan-2017-molten-salt-reactors-thorium-energy.md",
+    "02_Wiki/issues/fuel-salt-property-provenance-composition-applicability.md",
+    "03_Data/msre/properties/ornl-tm-2316-salt-properties.md",
+    "02_Wiki/sources/ornl-tm-2316-cantor-1968.md",
+    "01_Raw/code/_noncanonical/README.md",
+    "01_Raw/code/_noncanonical/README 1.md",
+    "01_Raw/code/_noncanonical/PHASE_LOG.md",
+    "01_Raw/code/_noncanonical/DYMOLA_B0_BASELINE.md",
+    "01_Raw/code/_noncanonical/DYMOLA_B0_BASELINE 1.md",
+    "01_Raw/code/_noncanonical/BENCHMARK_BRANCH_ARCHITECTURE.md",
+    "01_Raw/code/_noncanonical/BENCHMARK_BRANCH_ARCHITECTURE 1.md",
+    "02_Wiki/equations/thermal-hydraulics-foundations.md",
+    "03_Data/registry.md",
+    "04_Projects/msre-transform-status.md",
+    "06_Logs/daily/2026-09-03.md",
+    "06_Logs/daily/2026-09-02.md",
+    "raw/Claude Code.md",
+    "01_Raw/misc/Claude Code 세션 클리핑 - ORNL 자료 ingest 방침 (2026-09-03).md",
+    "02_Wiki/reviews/2026-09-03-inbox-raw-code-classification.md",
+    "02_Wiki/systems/msre/implementation/code-provenance-tags.md",
+    "Untitled 1.canvas",
+    "Untitled.canvas"
+  ]
+}
