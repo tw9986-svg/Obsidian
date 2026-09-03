@@ -28,3 +28,4 @@ last_updated: {{date:YYYY-MM-DD}}
 ## 관련 페이지
 - [[index]]
 - [[03_Data/registry]]
+- [[04_Projects/gemini-research-director]]

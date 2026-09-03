@@ -72,6 +72,7 @@
 
 ## Projects (`04_Projects/`)
 - [[04_Projects/msre-transform-status]] — MSRE TRANSFORM 연구 진행 상황
+- [[04_Projects/gemini-research-director]] — Gemini가 읽을 파일·문헌 요청·수치 검증 출력 계약
 
 ## Logs (`06_Logs/`)
 - `06_Logs/ingest_log.md` — ingest 이력
