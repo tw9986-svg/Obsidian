@@ -48,9 +48,9 @@ $body = @{
     agent = "deep-research-preview-04-2026"
     input = $prompt
     background = $true
-    agentConfig = @{
+    agent_config = @{
         type = "deep-research"
-        thinkingSummaries = "auto"
+        thinking_summaries = "auto"
     }
 } | ConvertTo-Json -Depth 10
 
