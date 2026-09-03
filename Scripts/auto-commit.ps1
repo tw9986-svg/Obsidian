@@ -7,7 +7,8 @@ if ([string]::IsNullOrWhiteSpace(($status -join "`n"))) {
     exit 0
 }
 
-git -C $repoRoot add -A
+# Keep editor session state out of automatic research commits.
+git -C $repoRoot add -A -- ":(exclude).obsidian/workspace.json"
 
 $staged = git -C $repoRoot diff --cached --name-only
 if ([string]::IsNullOrWhiteSpace(($staged -join "`n"))) {
