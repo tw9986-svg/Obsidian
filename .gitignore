@@ -9,6 +9,7 @@
 .obsidian/workspace.json
 .obsidian/plugins/obsidian-local-rest-api/data.json
 .claude/state/
+*.gemini-key
 
 # OS / 편집기 부산물
 Thumbs.db

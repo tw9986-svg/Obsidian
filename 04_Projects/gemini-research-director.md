@@ -65,3 +65,14 @@ last_updated: 2026-09-03
 - **Claude Code**: `00_Inbox/` 자료의 hash·중복·provenance를 검증하고 정규 계층에 편입한다.
 - **Obsidian Web Clipper**: 신규 클리핑의 저장 위치를 `00_Inbox`로 고정한다.
 
+## 6. 자동 실행 방법
+
+Gemini API 키는 저장소 파일에 넣지 않고 Windows 사용자 환경변수로 등록한다.
+
+```powershell
+[Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "<your-api-key>", "User")
+```
+
+VS Code에서 `Tasks: Run Task` → **Research: generate Gemini guidance**를 실행하면 [run-gemini-research-director.ps1](../Scripts/run-gemini-research-director.ps1)가 지정된 기준 파일을 읽고 `04_Projects/gemini-guidance-YYYY-MM-DD.md`를 생성한다. Gemini는 텍스트만 반환하고 파일 쓰기는 오케스트레이터가 수행한다.
+
+API 키가 없는 상태에서는 작업이 명확한 오류와 함께 중단되며, 키를 저장소·Obsidian 설정·로그에 기록하지 않는다.

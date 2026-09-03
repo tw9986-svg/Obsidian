@@ -28,6 +28,19 @@
             ],
             "isBackground": true,
             "problemMatcher": []
+        },
+        {
+            "label": "Research: generate Gemini guidance",
+            "type": "shell",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\Scripts\\run-gemini-research-director.ps1"
+            ],
+            "problemMatcher": []
         }
     ]
 }
