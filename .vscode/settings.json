@@ -1,0 +1,12 @@
+{
+    "emeraldwalk.runonsave": {
+        "commands": [
+            {
+                "match": ".*",
+                "cmd": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${workspaceFolder}\\Scripts\\auto-commit.ps1\"",
+                "isAsync": true,
+                "runIn": "backend"
+            }
+        ]
+    }
+}
