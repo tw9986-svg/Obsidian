@@ -22,7 +22,7 @@ last_updated: {{date:YYYY-MM-DD}}
 |---|---|---|
 | 기초 데이터 구축 | MSRE geometry, 연료염 물성(밀도/점도/비열/열전도도), ORNL/INL/MARS 문헌 확보 | 진행 |
 | 1D Core 열수력 | 축방향 노달화, 연속·질량·에너지 보존, 축방향 체적발열, inlet/outlet T·ΔP 검증 | **PASS** |
-| Primary Loop | Core–piping–pump–HX 구성, component volume/fuel inventory, pressure loss, transit time | Steady hydraulics **PASS** / Inventory·transit-time identity **PASS** / Jeong transit-time **BENCHMARK DIFFERENCE** |
+| Primary Loop / HX | Core–piping–pump–HX 구성, component volume/fuel inventory, pressure loss, transit time, HX 열수지 | Primary-loop steady hydraulics **PASS** / Inventory·transit-time identity **PASS** / HX 2차측 경계조건 단순화 / 독립 HX 열전달 검증 **미완료** |
 | DNP (Delayed Neutron Precursor) | 생성·붕괴·유동수송, core 밖 precursor transport, analytic vs numerical | Full-loop transport **PASS** / Circulation reactivity **PASS** |
 | Pump 모델 | Motor–hydraulic–friction torque, rotor ODE, affinity law (Q∝N, H∝N², P∝N³), τ_shaft=4s | **PASS** (standalone) |
 | Pump Startup/Coastdown Benchmark | Jeong MARS + 실험데이터 digitization vs Dymola | 진행 — coastdown 유량감소곡선 TRANSFORM–MARS 차이 확인 |
@@ -36,6 +36,7 @@ last_updated: {{date:YYYY-MM-DD}}
 - **Pump coastdown 유량 감쇠 차이** (LARGE BENCHMARK_DIFFERENCE): 10 s에서 TRANSFORM 27.5% vs MARS 6.57%. 인과사슬 `FLOW_ERROR → DNP_RESIDENCE_ERROR → REACTIVITY_ERROR`. 단 반응도는 TRANSFORM이 MARS보다 실측에 더 근접(MAE 19.3 vs 24.8 pcm). → [[02_Wiki/systems/msre/benchmark/pump-startup-coastdown-vs-mars]]
   - 참고: Jeong의 MARS 모델도 펌프는 **generic 파라미터**(상세 자료 부재) — 기준값 자체의 불확실성 요인 ([[02_Wiki/sources/jeong-2026-mars-msre-benchmark]])
 - **전이시간 +7.6~7.9%** (TRANSFORM 27.651 s vs Jeong 25.63~25.70 s). 기준값 자체가 문서마다 불일치 → [[02_Wiki/issues/jeong-transit-time-value-mismatch]]
+- **HX 모델 범위**: 현재 TRANSFORM은 HX 2차측 전체 계통을 해석하지 않고 경계조건/열침으로 단순화한다. 형상값은 확보했지만 양측 열전달계수·압력손실·열수지의 독립 검증은 남아 있다. → [[02_Wiki/systems/msre/components/heat-exchanger]]
 - **Radial power distribution**: 원 논문은 비공개 Serpent 결과 사용, 우리 모델은 J0(25% reflector saving, peak/avg 1.61) 대체 = **ASSUMED**
 - **흑연 발열분율 6%**의 1차 근거 미확보 → [[02_Wiki/issues/graphite-heating-fraction-provenance]]
 - **펌프 수두 문헌 충돌** → [[02_Wiki/issues/pump-discharge-head-conflict]] (모델 값 0.301 MPa는 1차와 정합, 조치 불필요)
@@ -45,9 +46,9 @@ last_updated: {{date:YYYY-MM-DD}}
 
 **완료**: Property baseline, Geometry baseline, Core1D TH, Primary-loop steady hydraulics, Inventory/transit time, DNP full-loop transport, Circulation reactivity, Pump rotor standalone, Core1D/Core2D structural verification.
 
-**진행 중**: Pump startup/coastdown 오차 개선, 2D radial nodalization 검증, Axial/radial power distribution 원자료 재현, Graphite volumetric heating 및 2D conduction 검증.
+**진행 중**: Pump startup/coastdown 오차 개선, 2D radial nodalization 검증, Axial/radial power distribution 원자료 재현, Graphite volumetric heating 및 2D conduction 검증, HX 열전달 모델 범위·closure 정리.
 
-**이후**: Fuel–graphite heat-transfer coupling, 2D full-core thermal analysis, 8–10 MW steady-state benchmark, Natural circulation, 고출력 transient benchmark, 실험데이터/MARS/TRANSFORM 종합 비교, 모델 입력값 전체 provenance database 구축.
+**이후**: HX 양측 상세 모델 및 열수지 검증, Fuel–graphite heat-transfer coupling, 2D full-core thermal analysis, 8–10 MW steady-state benchmark, Natural circulation, 고출력 transient benchmark, 실험데이터/MARS/TRANSFORM 종합 비교, 모델 입력값 전체 provenance database 구축.
 
 ## 연구 진행 흐름
 
